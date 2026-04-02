@@ -43,7 +43,7 @@ echo
 echo "Building multi-arch cluster image..."
 tasks/scripts/docker-build-image.sh cluster
 
-TAGS_TO_APPLY=("${EXTRA_TAGS[@]}")
+TAGS_TO_APPLY=(${EXTRA_TAGS[@]+"${EXTRA_TAGS[@]}"})
 if [[ "${TAG_LATEST}" == "true" ]]; then
   TAGS_TO_APPLY+=("latest")
 fi
