@@ -16,6 +16,7 @@ fn mock_candidates(base_url: &str) -> Vec<ResolvedRoute> {
         auth: AuthHeader::Bearer,
         default_headers: Vec::new(),
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }]
 }
 
@@ -119,6 +120,7 @@ async fn proxy_no_compatible_route_returns_error() {
         auth: AuthHeader::Custom("x-api-key"),
         default_headers: Vec::new(),
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }];
 
     let err = router
@@ -181,6 +183,7 @@ async fn proxy_mock_route_returns_canned_response() {
         auth: AuthHeader::Bearer,
         default_headers: Vec::new(),
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }];
 
     let body = serde_json::to_vec(&serde_json::json!({
@@ -316,6 +319,7 @@ async fn proxy_uses_x_api_key_for_anthropic_route() {
         auth: AuthHeader::Custom("x-api-key"),
         default_headers: vec![("anthropic-version".to_string(), "2023-06-01".to_string())],
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }];
 
     let body = serde_json::to_vec(&serde_json::json!({
@@ -375,6 +379,7 @@ async fn proxy_anthropic_does_not_send_bearer_auth() {
         auth: AuthHeader::Custom("x-api-key"),
         default_headers: vec![("anthropic-version".to_string(), "2023-06-01".to_string())],
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }];
 
     let response = router
@@ -420,6 +425,7 @@ async fn proxy_forwards_client_anthropic_version_header() {
         auth: AuthHeader::Custom("x-api-key"),
         default_headers: vec![("anthropic-version".to_string(), "2023-06-01".to_string())],
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }];
 
     let body = serde_json::to_vec(&serde_json::json!({
@@ -463,6 +469,7 @@ fn config_resolves_routes_with_protocol() {
             protocols: vec!["openai_chat_completions".to_string()],
             api_key: Some("key".to_string()),
             api_key_env: None,
+            strip_version_prefix: false,
         }],
     };
     let routes = config.resolve_routes().unwrap();

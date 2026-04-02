@@ -21,6 +21,7 @@ fn make_system_route() -> ResolvedRoute {
         auth: AuthHeader::Bearer,
         default_headers: Vec::new(),
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }
 }
 
@@ -34,6 +35,7 @@ fn make_user_route() -> ResolvedRoute {
         auth: AuthHeader::Bearer,
         default_headers: Vec::new(),
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     }
 }
 
@@ -127,6 +129,7 @@ async fn system_inference_with_anthropic_protocol() {
         auth: AuthHeader::Custom("x-api-key"),
         default_headers: vec![("anthropic-version".to_string(), "2023-06-01".to_string())],
         timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+        strip_version_prefix: false,
     };
 
     let ctx = InferenceContext::new(patterns, router, vec![], vec![system_route]);

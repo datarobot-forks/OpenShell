@@ -113,6 +113,11 @@ message ResolvedRoute {
   string provider_type = 6;
   // Per-route request timeout in seconds. 0 means use default (60s).
   uint64 timeout_secs = 7;
+  // When true, strip the leading /v1 segment from probe and request paths
+  // before appending them to base_url. Use this when base_url already points
+  // at a gateway whose root maps directly to the API endpoints
+  // (e.g. https://app.eu.datarobot.com/api/v2/genai/llmgw → /chat/completions).
+  bool strip_version_prefix = 8;
 }
 
 message GetInferenceBundleResponse {

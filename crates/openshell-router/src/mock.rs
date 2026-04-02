@@ -132,6 +132,7 @@ mod tests {
             auth: crate::config::AuthHeader::Bearer,
             default_headers: Vec::new(),
             timeout: crate::config::DEFAULT_ROUTE_TIMEOUT,
+            strip_version_prefix: false,
         }
     }
 

@@ -815,6 +815,7 @@ pub(crate) fn bundle_to_resolved_routes(
                 auth,
                 default_headers,
                 timeout,
+                strip_version_prefix: r.strip_version_prefix,
             }
         })
         .collect()
@@ -1688,6 +1689,7 @@ mod tests {
                     ],
                     provider_type: "openai".to_string(),
                     timeout_secs: 0,
+                    strip_version_prefix: false,
                 },
                 openshell_core::proto::ResolvedRoute {
                     name: "local".to_string(),
@@ -1697,6 +1699,7 @@ mod tests {
                     protocols: vec!["openai_chat_completions".to_string()],
                     provider_type: String::new(),
                     timeout_secs: 120,
+                    strip_version_prefix: false,
                 },
             ],
             revision: "abc123".to_string(),
@@ -1757,6 +1760,7 @@ mod tests {
                 protocols: vec!["openai_chat_completions".to_string()],
                 provider_type: "openai".to_string(),
                 timeout_secs: 0,
+                strip_version_prefix: false,
             }],
             revision: "rev".to_string(),
             generated_at_ms: 0,
@@ -1778,6 +1782,7 @@ mod tests {
                 auth: openshell_core::inference::AuthHeader::Bearer,
                 default_headers: vec![],
                 timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+                strip_version_prefix: false,
             },
             openshell_router::config::ResolvedRoute {
                 name: "sandbox-system".to_string(),
@@ -1788,6 +1793,7 @@ mod tests {
                 auth: openshell_core::inference::AuthHeader::Custom("x-api-key"),
                 default_headers: vec![],
                 timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+                strip_version_prefix: false,
             },
         ];
 
@@ -2077,6 +2083,7 @@ filesystem_policy:
             protocols: vec!["openai_chat_completions".to_string()],
             default_headers: vec![],
             timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+            strip_version_prefix: false,
         }];
 
         let cache = Arc::new(RwLock::new(routes));

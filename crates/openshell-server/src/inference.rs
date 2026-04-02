@@ -262,6 +262,14 @@ fn resolve_provider_route(provider: &Provider) -> Result<ResolvedProviderRoute, 
         )));
     }
 
+    // Opt-in to stripping the /v1 prefix when the provider config explicitly
+    // sets STRIP_VERSION_PREFIX=true (e.g. for gateways like DataRobot whose
+    // base URL already points directly at the API root).
+    let strip_version_prefix = provider
+        .config
+        .get("STRIP_VERSION_PREFIX")
+        .is_some_and(|v| v.trim().eq_ignore_ascii_case("true"));
+
     Ok(ResolvedProviderRoute {
         provider_type,
         route: RouterResolvedRoute {
@@ -277,6 +285,7 @@ fn resolve_provider_route(provider: &Provider) -> Result<ResolvedProviderRoute, 
                 .map(|(name, value)| ((*name).to_string(), (*value).to_string()))
                 .collect(),
             timeout: openshell_router::config::DEFAULT_ROUTE_TIMEOUT,
+            strip_version_prefix,
         },
     })
 }
@@ -405,6 +414,7 @@ async fn resolve_inference_bundle(store: &Store) -> Result<GetInferenceBundleRes
             r.protocols.hash(&mut hasher);
             r.provider_type.hash(&mut hasher);
             r.timeout_secs.hash(&mut hasher);
+            r.strip_version_prefix.hash(&mut hasher);
         }
         format!("{:016x}", hasher.finish())
     };
@@ -466,6 +476,7 @@ async fn resolve_route_by_name(
         protocols: resolved.route.protocols,
         provider_type: resolved.provider_type,
         timeout_secs: config.timeout_secs,
+        strip_version_prefix: resolved.route.strip_version_prefix,
     }))
 }
 

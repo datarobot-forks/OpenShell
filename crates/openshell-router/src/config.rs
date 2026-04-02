@@ -29,6 +29,11 @@ pub struct RouteConfig {
     pub api_key: Option<String>,
     #[serde(default)]
     pub api_key_env: Option<String>,
+    /// When true, strip the leading `/v1` segment from request paths before
+    /// appending to `endpoint`. Use for gateways whose base URL already maps
+    /// directly to the API root (e.g. DataRobot LLM Gateway).
+    #[serde(default)]
+    pub strip_version_prefix: bool,
 }
 
 /// A fully-resolved route ready for the router to forward requests.
@@ -50,6 +55,10 @@ pub struct ResolvedRoute {
     pub default_headers: Vec<(String, String)>,
     /// Per-request timeout for proxied inference calls.
     pub timeout: Duration,
+    /// When true, strip the leading `/v1` segment from request paths before
+    /// appending to `endpoint`. Use for gateways whose base URL already maps
+    /// directly to the API root (e.g. DataRobot LLM Gateway).
+    pub strip_version_prefix: bool,
 }
 
 impl std::fmt::Debug for ResolvedRoute {
@@ -63,6 +72,7 @@ impl std::fmt::Debug for ResolvedRoute {
             .field("auth", &self.auth)
             .field("default_headers", &self.default_headers)
             .field("timeout", &self.timeout)
+            .field("strip_version_prefix", &self.strip_version_prefix)
             .finish()
     }
 }
@@ -136,6 +146,7 @@ impl RouteConfig {
             auth,
             default_headers,
             timeout: DEFAULT_ROUTE_TIMEOUT,
+            strip_version_prefix: self.strip_version_prefix,
         })
     }
 }
@@ -264,6 +275,7 @@ routes:
             auth: AuthHeader::Bearer,
             default_headers: Vec::new(),
             timeout: DEFAULT_ROUTE_TIMEOUT,
+            strip_version_prefix: false,
         };
         let debug_output = format!("{route:?}");
         assert!(

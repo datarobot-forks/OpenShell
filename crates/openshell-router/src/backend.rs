@@ -95,7 +95,7 @@ async fn send_backend_request(
     headers: Vec<(String, String)>,
     body: bytes::Bytes,
 ) -> Result<reqwest::Response, RouterError> {
-    let url = build_backend_url(&route.endpoint, path);
+    let url = build_backend_url(&route.endpoint, path, route.strip_version_prefix);
 
     let reqwest_method: reqwest::Method = method
         .parse()
@@ -241,7 +241,7 @@ pub async fn verify_backend_endpoint(
 
     if mock::is_mock_route(route) {
         return Ok(ValidatedEndpoint {
-            url: build_backend_url(&route.endpoint, probe.path),
+            url: build_backend_url(&route.endpoint, probe.path, route.strip_version_prefix),
             protocol: probe.protocol.to_string(),
         });
     }
@@ -306,7 +306,7 @@ async fn try_validation_request(
                 details,
             },
         })?;
-    let url = build_backend_url(&route.endpoint, path);
+    let url = build_backend_url(&route.endpoint, path, route.strip_version_prefix);
 
     if response.status().is_success() {
         return Ok(ValidatedEndpoint {
@@ -418,8 +418,18 @@ pub async fn proxy_to_backend_streaming(
     })
 }
 
-fn build_backend_url(endpoint: &str, path: &str) -> String {
+fn build_backend_url(endpoint: &str, path: &str, strip_version_prefix: bool) -> String {
     let base = endpoint.trim_end_matches('/');
+
+    // Explicit opt-in: strip the leading /v1 segment for gateways whose base
+    // URL already maps directly to the API root (e.g. DataRobot LLM Gateway).
+    if strip_version_prefix {
+        let stripped = path.strip_prefix("/v1").unwrap_or(path);
+        return format!("{base}{stripped}");
+    }
+
+    // Standard deduplication: if the base already ends with /v1 and the path
+    // also starts with /v1, avoid doubling it.
     if base.ends_with("/v1") && (path == "/v1" || path.starts_with("/v1/")) {
         return format!("{base}{}", &path[3..]);
     }
@@ -438,7 +448,7 @@ mod tests {
     #[test]
     fn build_backend_url_dedupes_v1_prefix() {
         assert_eq!(
-            build_backend_url("https://api.openai.com/v1", "/v1/chat/completions"),
+            build_backend_url("https://api.openai.com/v1", "/v1/chat/completions", false),
             "https://api.openai.com/v1/chat/completions"
         );
     }
@@ -446,7 +456,7 @@ mod tests {
     #[test]
     fn build_backend_url_preserves_non_versioned_base() {
         assert_eq!(
-            build_backend_url("https://api.anthropic.com", "/v1/messages"),
+            build_backend_url("https://api.anthropic.com", "/v1/messages", false),
             "https://api.anthropic.com/v1/messages"
         );
     }
@@ -454,8 +464,32 @@ mod tests {
     #[test]
     fn build_backend_url_handles_exact_v1_path() {
         assert_eq!(
-            build_backend_url("https://api.openai.com/v1", "/v1"),
+            build_backend_url("https://api.openai.com/v1", "/v1", false),
             "https://api.openai.com/v1"
+        );
+    }
+
+    #[test]
+    fn build_backend_url_strips_v1_for_gateway() {
+        assert_eq!(
+            build_backend_url(
+                "https://app.eu.datarobot.com/api/v2/genai/llmgw",
+                "/v1/chat/completions",
+                true,
+            ),
+            "https://app.eu.datarobot.com/api/v2/genai/llmgw/chat/completions"
+        );
+    }
+
+    #[test]
+    fn build_backend_url_strips_v1_for_gateway_messages() {
+        assert_eq!(
+            build_backend_url(
+                "https://app.eu.datarobot.com/api/v2/genai/llmgw",
+                "/v1/messages",
+                true,
+            ),
+            "https://app.eu.datarobot.com/api/v2/genai/llmgw/messages"
         );
     }
 
@@ -469,6 +503,7 @@ mod tests {
             auth,
             default_headers: vec![("anthropic-version".to_string(), "2023-06-01".to_string())],
             timeout: crate::config::DEFAULT_ROUTE_TIMEOUT,
+            strip_version_prefix: false,
         }
     }
 
