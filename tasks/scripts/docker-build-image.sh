@@ -120,39 +120,12 @@ RUST_SCOPE=${RUST_TOOLCHAIN_SCOPE:-$(detect_rust_scope "${DOCKERFILE}")}
 CACHE_SCOPE_INPUT="v2|shared|release|${LOCK_HASH}|${RUST_SCOPE}"
 CARGO_TARGET_CACHE_SCOPE=$(printf '%s' "${CACHE_SCOPE_INPUT}" | sha256_16_stdin)
 
-# The cluster image embeds the packaged Helm chart and HelmChart manifest.
+# The cluster image embeds the packaged Helm chart.
 if [[ "${TARGET}" == "cluster" ]]; then
   mkdir -p deploy/docker/.build/charts
-  mkdir -p deploy/docker/.build/manifests
-
-  # When IMAGE_REGISTRY is set, override the chart's default image repository
-  # so the cluster pulls from the correct registry.
-  if [[ -n "${IMAGE_REGISTRY:-}" ]]; then
-    TEMP_CHART_DIR=$(mktemp -d)
-    trap 'rm -rf "${TEMP_CHART_DIR}"' EXIT
-    cp -r deploy/helm/openshell "${TEMP_CHART_DIR}/"
-
-    # Replace the repository in values.yaml with the target registry
-    sed -i.bak "s|repository: ghcr.io/nvidia/openshell/gateway|repository: ${IMAGE_REGISTRY}/gateway|" \
-      "${TEMP_CHART_DIR}/openshell/values.yaml"
-    rm -f "${TEMP_CHART_DIR}/openshell/values.yaml.bak"
-
-    # Also update the HelmChart manifest template that k3s reads
-    sed "s|repository: ghcr.io/nvidia/openshell/gateway|repository: ${IMAGE_REGISTRY}/gateway|" \
-      deploy/kube/manifests/openshell-helmchart.yaml > deploy/docker/.build/manifests/openshell-helmchart.yaml
-
-    if ! helm package "${TEMP_CHART_DIR}/openshell" -d deploy/docker/.build/charts/ >/dev/null 2>&1; then
-      echo "Warning: helm package failed, trying without plugin load..." >&2
-      HELM_PLUGINS="" helm package "${TEMP_CHART_DIR}/openshell" -d deploy/docker/.build/charts/ >/dev/null
-    fi
-  else
-    # No custom registry, use original manifest
-    cp deploy/kube/manifests/openshell-helmchart.yaml deploy/docker/.build/manifests/
-
-    if ! helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null 2>&1; then
-      echo "Warning: helm package failed, trying without plugin load..." >&2
-      HELM_PLUGINS="" helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null
-    fi
+  if ! helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null 2>&1; then
+    echo "Warning: helm package failed, trying without plugin load..." >&2
+    HELM_PLUGINS="" helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null
   fi
 fi
 
@@ -198,6 +171,11 @@ if [[ -n "${EXTRA_CARGO_FEATURES}" ]]; then
   FEATURE_ARGS=(--build-arg "EXTRA_CARGO_FEATURES=${EXTRA_CARGO_FEATURES}")
 fi
 
+REGISTRY_ARGS=()
+if [[ -n "${IMAGE_REGISTRY:-}" ]]; then
+  REGISTRY_ARGS=(--build-arg "DEFAULT_IMAGE_REGISTRY=${IMAGE_REGISTRY}")
+fi
+
 docker buildx build \
   ${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"} \
   ${DOCKER_PLATFORM:+--platform ${DOCKER_PLATFORM}} \
@@ -207,6 +185,7 @@ docker buildx build \
   ${K3S_ARGS[@]+"${K3S_ARGS[@]}"} \
   ${CODEGEN_ARGS[@]+"${CODEGEN_ARGS[@]}"} \
   ${FEATURE_ARGS[@]+"${FEATURE_ARGS[@]}"} \
+  ${REGISTRY_ARGS[@]+"${REGISTRY_ARGS[@]}"} \
   --build-arg "CARGO_TARGET_CACHE_SCOPE=${CARGO_TARGET_CACHE_SCOPE}" \
   -f "${DOCKERFILE}" \
   --target "${DOCKER_TARGET}" \

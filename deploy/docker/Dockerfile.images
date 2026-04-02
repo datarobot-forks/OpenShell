@@ -20,6 +20,7 @@ ARG K3S_DIGEST=sha256:c3184157c3048112bab0c3e17405991da486cb3413511eba23f7650efd
 ARG K9S_VERSION=v0.50.18
 ARG HELM_VERSION=v3.17.3
 ARG NVIDIA_CONTAINER_TOOLKIT_VERSION=1.18.2-1
+ARG DEFAULT_IMAGE_REGISTRY=ghcr.io/nvidia/openshell
 
 # ---------------------------------------------------------------------------
 # Shared Rust build stages
@@ -224,6 +225,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Final cluster image
 # ---------------------------------------------------------------------------
 FROM nvcr.io/nvidia/base/ubuntu:noble-20251013 AS cluster
+ARG DEFAULT_IMAGE_REGISTRY
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -256,25 +258,14 @@ RUN mkdir -p /var/lib/rancher/k3s/server/manifests \
              /run/flannel
 
 COPY deploy/docker/cluster-entrypoint.sh /usr/local/bin/cluster-entrypoint.sh
-RUN chmod +x /usr/local/bin/cluster-entrypoint.sh
+RUN sed -i "s|__DEFAULT_IMAGE_REGISTRY__|${DEFAULT_IMAGE_REGISTRY}|g" /usr/local/bin/cluster-entrypoint.sh && \
+    chmod +x /usr/local/bin/cluster-entrypoint.sh
 
 COPY deploy/docker/cluster-healthcheck.sh /usr/local/bin/cluster-healthcheck.sh
 RUN chmod +x /usr/local/bin/cluster-healthcheck.sh
 
 COPY deploy/docker/.build/charts/*.tgz /opt/openshell/charts/
-# Copy HelmChart manifest - use modified version if it exists (when IMAGE_REGISTRY is set),
-# otherwise use the original. Other manifests are copied as-is.
-COPY deploy/docker/.build/manifests/openshell-helmchart.yaml* /tmp/manifests/
-COPY deploy/kube/manifests/*.yaml /tmp/manifests-src/
-RUN if [ -f /tmp/manifests/openshell-helmchart.yaml ]; then \
-      cp /tmp/manifests/openshell-helmchart.yaml /opt/openshell/manifests/; \
-    else \
-      cp /tmp/manifests-src/openshell-helmchart.yaml /opt/openshell/manifests/; \
-    fi && \
-    for f in /tmp/manifests-src/*.yaml; do \
-      name=$(basename "$f"); \
-      [ "$name" != "openshell-helmchart.yaml" ] && cp "$f" /opt/openshell/manifests/; \
-    done || true
+COPY deploy/kube/manifests/*.yaml /opt/openshell/manifests/
 COPY deploy/kube/gpu-manifests/*.yaml /opt/openshell/gpu-manifests/
 
 ENTRYPOINT ["/usr/local/bin/cluster-entrypoint.sh"]

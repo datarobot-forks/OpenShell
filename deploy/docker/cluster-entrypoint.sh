@@ -465,6 +465,12 @@ SSH_HANDSHAKE_SECRET="${SSH_HANDSHAKE_SECRET:-$(head -c 32 /dev/urandom | od -A 
 # Inject SSH gateway host/port into the HelmChart manifest so the openshell
 # server returns the correct address to CLI clients for SSH proxy CONNECT.
 if [ -f "$HELMCHART" ]; then
+    # Set the image registry for component images. Defaults to the value baked into
+    # the image at build time, which can be overridden via IMAGE_REPO_BASE env var.
+    EFFECTIVE_IMAGE_REGISTRY="${IMAGE_REPO_BASE:-__DEFAULT_IMAGE_REGISTRY__}"
+    echo "Setting image registry: ${EFFECTIVE_IMAGE_REGISTRY}"
+    sed -i "s|__IMAGE_REGISTRY__|${EFFECTIVE_IMAGE_REGISTRY}|g" "$HELMCHART"
+
     if [ -n "$SSH_GATEWAY_HOST" ]; then
         echo "Setting SSH gateway host: $SSH_GATEWAY_HOST"
         sed -i "s|__SSH_GATEWAY_HOST__|${SSH_GATEWAY_HOST}|g" "$HELMCHART"
