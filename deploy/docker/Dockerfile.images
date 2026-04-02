@@ -262,7 +262,19 @@ COPY deploy/docker/cluster-healthcheck.sh /usr/local/bin/cluster-healthcheck.sh
 RUN chmod +x /usr/local/bin/cluster-healthcheck.sh
 
 COPY deploy/docker/.build/charts/*.tgz /opt/openshell/charts/
-COPY deploy/kube/manifests/*.yaml /opt/openshell/manifests/
+# Copy HelmChart manifest - use modified version if it exists (when IMAGE_REGISTRY is set),
+# otherwise use the original. Other manifests are copied as-is.
+COPY deploy/docker/.build/manifests/openshell-helmchart.yaml* /tmp/manifests/
+COPY deploy/kube/manifests/*.yaml /tmp/manifests-src/
+RUN if [ -f /tmp/manifests/openshell-helmchart.yaml ]; then \
+      cp /tmp/manifests/openshell-helmchart.yaml /opt/openshell/manifests/; \
+    else \
+      cp /tmp/manifests-src/openshell-helmchart.yaml /opt/openshell/manifests/; \
+    fi && \
+    for f in /tmp/manifests-src/*.yaml; do \
+      name=$(basename "$f"); \
+      [ "$name" != "openshell-helmchart.yaml" ] && cp "$f" /opt/openshell/manifests/; \
+    done || true
 COPY deploy/kube/gpu-manifests/*.yaml /opt/openshell/gpu-manifests/
 
 ENTRYPOINT ["/usr/local/bin/cluster-entrypoint.sh"]

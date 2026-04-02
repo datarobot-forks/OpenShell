@@ -120,9 +120,10 @@ RUST_SCOPE=${RUST_TOOLCHAIN_SCOPE:-$(detect_rust_scope "${DOCKERFILE}")}
 CACHE_SCOPE_INPUT="v2|shared|release|${LOCK_HASH}|${RUST_SCOPE}"
 CARGO_TARGET_CACHE_SCOPE=$(printf '%s' "${CACHE_SCOPE_INPUT}" | sha256_16_stdin)
 
-# The cluster image embeds the packaged Helm chart.
+# The cluster image embeds the packaged Helm chart and HelmChart manifest.
 if [[ "${TARGET}" == "cluster" ]]; then
   mkdir -p deploy/docker/.build/charts
+  mkdir -p deploy/docker/.build/manifests
 
   # When IMAGE_REGISTRY is set, override the chart's default image repository
   # so the cluster pulls from the correct registry.
@@ -136,11 +137,18 @@ if [[ "${TARGET}" == "cluster" ]]; then
       "${TEMP_CHART_DIR}/openshell/values.yaml"
     rm -f "${TEMP_CHART_DIR}/openshell/values.yaml.bak"
 
+    # Also update the HelmChart manifest template that k3s reads
+    sed "s|repository: ghcr.io/nvidia/openshell/gateway|repository: ${IMAGE_REGISTRY}/gateway|" \
+      deploy/kube/manifests/openshell-helmchart.yaml > deploy/docker/.build/manifests/openshell-helmchart.yaml
+
     if ! helm package "${TEMP_CHART_DIR}/openshell" -d deploy/docker/.build/charts/ >/dev/null 2>&1; then
       echo "Warning: helm package failed, trying without plugin load..." >&2
       HELM_PLUGINS="" helm package "${TEMP_CHART_DIR}/openshell" -d deploy/docker/.build/charts/ >/dev/null
     fi
   else
+    # No custom registry, use original manifest
+    cp deploy/kube/manifests/openshell-helmchart.yaml deploy/docker/.build/manifests/
+
     if ! helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null 2>&1; then
       echo "Warning: helm package failed, trying without plugin load..." >&2
       HELM_PLUGINS="" helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null
