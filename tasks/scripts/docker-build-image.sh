@@ -123,7 +123,29 @@ CARGO_TARGET_CACHE_SCOPE=$(printf '%s' "${CACHE_SCOPE_INPUT}" | sha256_16_stdin)
 # The cluster image embeds the packaged Helm chart.
 if [[ "${TARGET}" == "cluster" ]]; then
   mkdir -p deploy/docker/.build/charts
-  helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null
+
+  # When IMAGE_REGISTRY is set, override the chart's default image repository
+  # so the cluster pulls from the correct registry.
+  if [[ -n "${IMAGE_REGISTRY:-}" ]]; then
+    TEMP_CHART_DIR=$(mktemp -d)
+    trap 'rm -rf "${TEMP_CHART_DIR}"' EXIT
+    cp -r deploy/helm/openshell "${TEMP_CHART_DIR}/"
+
+    # Replace the repository in values.yaml with the target registry
+    sed -i.bak "s|repository: ghcr.io/nvidia/openshell/gateway|repository: ${IMAGE_REGISTRY}/gateway|" \
+      "${TEMP_CHART_DIR}/openshell/values.yaml"
+    rm -f "${TEMP_CHART_DIR}/openshell/values.yaml.bak"
+
+    if ! helm package "${TEMP_CHART_DIR}/openshell" -d deploy/docker/.build/charts/ >/dev/null 2>&1; then
+      echo "Warning: helm package failed, trying without plugin load..." >&2
+      HELM_PLUGINS="" helm package "${TEMP_CHART_DIR}/openshell" -d deploy/docker/.build/charts/ >/dev/null
+    fi
+  else
+    if ! helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null 2>&1; then
+      echo "Warning: helm package failed, trying without plugin load..." >&2
+      HELM_PLUGINS="" helm package deploy/helm/openshell -d deploy/docker/.build/charts/ >/dev/null
+    fi
+  fi
 fi
 
 K3S_ARGS=()
